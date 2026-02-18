@@ -35,8 +35,8 @@ const lookAheadDistance = 1.5;
 // ==========================
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xFFFFFF);
-scene.fog = new THREE.Fog(0xFFFFFF, 5, 40);
+scene.background = new THREE.Color(0x000000);
+scene.fog = new THREE.Fog(0xFF00FF, 40);
 
 const camera = new THREE.PerspectiveCamera(
   75,
@@ -45,7 +45,7 @@ const camera = new THREE.PerspectiveCamera(
   1000
 );
 
-camera.position.set(0, cameraHeight, 0);
+camera.position.set(0, cameraHeight, 2);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO));
@@ -88,7 +88,7 @@ function getWaveX(z) {
 // ==========================
 
 const textureLoader = new THREE.TextureLoader();
-const svgTexture = textureLoader.load('./models/itachi.svg');
+const svgTexture = textureLoader.load('./models/snowman.png');
 
 const svgMaterial = new THREE.MeshBasicMaterial({
   map: svgTexture,
@@ -108,7 +108,7 @@ function createNameTag(text) {
   canvas.width = 512;
   canvas.height = 256;
 
-  ctx.fillStyle = "black";
+  ctx.fillStyle = "white";
   ctx.font = "bold 80px Arial";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
@@ -224,6 +224,7 @@ gsap.to(camera.position, {
   }
 });
 
+
 // ==========================
 // RENDER LOOP
 // ==========================
@@ -231,6 +232,8 @@ gsap.to(camera.position, {
 function animate() {
   requestAnimationFrame(animate);
   renderer.render(scene, camera);
+  if(camera.position.z )
+  console.log('camera pos',camera.position.z);
 }
 animate();
 
@@ -256,3 +259,4 @@ window.addEventListener("resize", handleResize);
 if (window.visualViewport) {
   window.visualViewport.addEventListener("resize", handleResize);
 }
+//-6 -24 -4  -58 -75
