@@ -88,7 +88,7 @@ function getWaveX(z) {
 // ==========================
 
 const textureLoader = new THREE.TextureLoader();
-const svgTexture = textureLoader.load('./models/snowman.png');
+const svgTexture = textureLoader.load('.public/models/snowman.png');
 
 const svgMaterial = new THREE.MeshBasicMaterial({
   map: svgTexture,
