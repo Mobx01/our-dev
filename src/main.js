@@ -4,6 +4,13 @@ import gsap from "https://cdn.jsdelivr.net/npm/gsap@3.12.5/+esm";
 import { ScrollTrigger } from "https://cdn.jsdelivr.net/npm/gsap@3.12.5/ScrollTrigger/+esm";
 
 gsap.registerPlugin(ScrollTrigger);
+// Improve mobile scroll behavior
+ScrollTrigger.config({
+  ignoreMobileResize: true
+});
+
+// Normalize touch scrolling
+ScrollTrigger.normalizeScroll(true);
 
 // ==========================
 // DEVICE OPTIMIZATION
@@ -194,7 +201,8 @@ createWave();
 // SCROLL CAMERA
 // ==========================
 
-const endZ = -95;
+const endZ = isMobile ? -75 : -95;
+
 
 gsap.to(camera.position, {
   z: endZ,
@@ -203,7 +211,7 @@ gsap.to(camera.position, {
     trigger: "#scrollArea",
     start: "top top",
     end: "bottom bottom",
-    scrub: 1
+    scrub: isMobile ? 1.5 : 1,
   },
   onUpdate: () => {
 
