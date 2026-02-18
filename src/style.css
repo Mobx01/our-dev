@@ -1,0 +1,19 @@
+canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100dvh;   /* modern fix for mobile browser bars */
+  display: block;
+}
+
+body {
+  margin: 0;
+  overflow-x: hidden;
+}
+
+
+#scrollArea {
+    height: 400vh; /* scroll distance */
+  }
+
