@@ -9,7 +9,7 @@ import { UnrealBloomPass } from 'https://cdn.jsdelivr.net/npm/three@0.158.0/exam
 gsap.registerPlugin(ScrollTrigger);
 
 ScrollTrigger.config({ ignoreMobileResize: true });
-ScrollTrigger.normalizeScroll(true);
+// ScrollTrigger.normalizeScroll(true); // MUST BE COMMENTED OUT FOR MOBILE SNAPPING TO WORK
 
 // ==========================
 // CONFIGURATION
@@ -37,12 +37,16 @@ const floatingSymbols = [];
 const clock = new THREE.Clock();
 
 // ==========================
-// SCENE SETUP
+// SCENE SETUP (TWO SCENES FOR SELECTIVE GLOW)
 // ==========================
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x000005); 
-scene.fog = new THREE.FogExp2(0x000005, 0.03); 
+// 1. Scene for objects that glow (Tubes, Particles, Symbols)
+const glowScene = new THREE.Scene();
+glowScene.background = new THREE.Color(0x000005); 
+glowScene.fog = new THREE.FogExp2(0x000005, 0.03); 
+
+// 2. Scene for objects that don't glow (Snowmen, Nametags)
+const nonGlowScene = new THREE.Scene();
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 
@@ -50,6 +54,9 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO));
 renderer.toneMapping = THREE.ReinhardToneMapping;
 renderer.toneMappingExposure = 1.5; 
+
+// IMPORTANT: Tell the renderer not to automatically erase the screen between renders
+renderer.autoClear = false; 
 
 function getViewportSize() {
   const width = window.visualViewport ? window.visualViewport.width : window.innerWidth;
@@ -64,16 +71,17 @@ camera.updateProjectionMatrix();
 
 document.body.appendChild(renderer.domElement);
 
-// --- POST-PROCESSING (NEON GLOW) ---
-const renderScene = new RenderPass(scene, camera);
+// --- POST-PROCESSING ---
 
+// Only put the glowing scene into the composer
+const renderGlowPass = new RenderPass(glowScene, camera);
 const bloomPass = new UnrealBloomPass(new THREE.Vector2(width, height), 1.5, 0.4, 0.85);
 bloomPass.threshold = 0.08;
 bloomPass.strength = 0.5; 
 bloomPass.radius = 0.5;
 
 const composer = new EffectComposer(renderer);
-composer.addPass(renderScene);
+composer.addPass(renderGlowPass);
 composer.addPass(bloomPass);
 
 // ==========================
@@ -116,8 +124,6 @@ function generateGradientTexture() {
 // ==========================
 
 function createTunnelVisuals() {
-  
-  // --- 1. THICK GLOWING TUBES (STATIC) ---
   const lineCount = 10; 
   const pointsPerLine = 60;
   const gradientTexture = generateGradientTexture();
@@ -146,10 +152,9 @@ function createTunnelVisuals() {
     const curve = new THREE.CatmullRomCurve3(points);
     const geometry = new THREE.TubeGeometry(curve, 100, 0.04, 8, false);
     const mesh = new THREE.Mesh(geometry, tubeMaterial);
-    scene.add(mesh);
+    glowScene.add(mesh); 
   }
 
-  // --- 2. FLOATING PARTICLES (MOVING) ---
   const particleCount = 800;
   const particleGeo = new THREE.BufferGeometry();
   const particlePos = [];
@@ -184,11 +189,11 @@ function createTunnelVisuals() {
   });
 
   particleSystem = new THREE.Points(particleGeo, particleMat);
-  scene.add(particleSystem);
+  glowScene.add(particleSystem); 
 }
 
 // ==========================
-// DEVELOPER SYNTAX / MATH SYMBOLS
+// DEVELOPER SYNTAX / MATH SYMBOLS 
 // ==========================
 
 function createFloatingSymbols() {
@@ -198,7 +203,7 @@ function createFloatingSymbols() {
     '404', '!', 'X', 'null'
   ];
   
-  const baseColors = ['#00ffff', '#00aaff', '#ff0000ff', '#00ff88'];
+  const baseColors = ['#00ffff', '#00aaff', '#ff0000', '#00ff88'];
 
   const materials = chars.flatMap(char => {
     return baseColors.map(colorHex => {
@@ -207,12 +212,10 @@ function createFloatingSymbols() {
       canvas.height = 128;
       const ctx = canvas.getContext('2d');
       
-      // UPDATED: Reduced shadow blur so text stays crisp
       ctx.shadowColor = colorHex;
       ctx.shadowBlur = 4; 
       ctx.fillStyle = colorHex;
       
-      // UPDATED: Bumped up the font size relative to the canvas
       ctx.font = 'bold 50px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -229,7 +232,6 @@ function createFloatingSymbols() {
         depthWrite: false
       });
       
-      // UPDATED: Removed the scalar multiplier to prevent blowout
       material.color.set(colorHex);
 
       return material;
@@ -249,8 +251,7 @@ function createFloatingSymbols() {
     
     sprite.position.set(x, y, z);
     
-    // UPDATED: Increased the scale range for larger, more visible symbols
-    const scale = 0.5 + Math.random() * 0.7; // Generates sizes between 0.5 and 1.2
+    const scale = 0.5 + Math.random() * 0.7; 
     sprite.scale.set(scale, scale, scale);
     
     sprite.userData = {
@@ -262,7 +263,7 @@ function createFloatingSymbols() {
        zSpeed: Math.random() * 0.02 + 0.005 
     };
     
-    scene.add(sprite);
+    glowScene.add(sprite); 
     floatingSymbols.push(sprite);
   }
 }
@@ -296,6 +297,10 @@ function createNameTag(text) {
   return mesh;
 }
 
+// ==========================
+// WAVE FUNCTION (SNOWMEN) 
+// ==========================
+
 function createWave() {
   for (let n = 0; n < boxCount; n++) {
     const baseZ = -(Math.PI / 2 + n * Math.PI) / (frequency * 0.1 * waveStretch);
@@ -312,15 +317,33 @@ function createWave() {
       nameTag.position.set(isRightBox ? 1 + nameSideOffset : nameSideOffset - 7, cameraHeight, z);
       mesh.position.set(x, cameraHeight, z);
     }
-    scene.add(mesh);
-    scene.add(nameTag);
+    nonGlowScene.add(mesh);
+    nonGlowScene.add(nameTag);
   }
 }
 createWave();
 
 // ==========================
-// SCROLL ANIMATION
+// SCROLL ANIMATION (MOBILE-OPTIMIZED SNAPPING)
 // ==========================
+
+const snapPoints = [];
+const totalPathZ = startZ - deepZ; 
+// Bring camera slightly closer on mobile so it doesn't overshoot the view
+const viewOffsetZ = isMobile ? 4.5 : 6; 
+
+for (let n = 0; n < boxCount; n++) {
+  const baseZ = -(Math.PI / 2 + n * Math.PI) / (frequency * 0.1 * waveStretch);
+  const boxZ = baseZ * boxSpacingMultiplier;
+  const targetCameraZ = boxZ + viewOffsetZ;
+  const progress = (targetCameraZ - deepZ) / totalPathZ;
+  
+  if (progress >= 0 && progress <= 1) {
+      snapPoints.push(progress);
+  }
+}
+
+snapPoints.sort((a, b) => a - b);
 
 gsap.to(camera.position, {
   z: startZ,
@@ -329,7 +352,13 @@ gsap.to(camera.position, {
     trigger: "#scrollArea",
     start: "top top",
     end: "bottom bottom",
-    scrub: isMobile ? 1.5 : 1,
+    scrub: isMobile ? 0.5 : 1, // Lowered scrub for mobile.
+    snap: {
+      snapTo: snapPoints,
+      duration: { min: 0.2, max: 0.6 }, // Faster snapping duration
+      delay: 0.05, // Snaps quickly after scroll stops
+      ease: "power1.inOut"
+    }
   },
   onUpdate: () => {
     camera.position.x = getWaveX(camera.position.z);
@@ -351,7 +380,6 @@ function animate() {
   
   const time = clock.getElapsedTime();
 
-  // --- Animate Particles ---
   if (particleSystem) {
     const positions = particleSystem.geometry.attributes.position.array;
     const data = particleSystem.geometry.userData.animationData;
@@ -372,7 +400,6 @@ function animate() {
     particleSystem.geometry.attributes.position.needsUpdate = true;
   }
 
-  // --- Animate Developer Symbols ---
   floatingSymbols.forEach(sprite => {
     const waveCenterX = getWaveX(sprite.position.z);
     
@@ -382,17 +409,26 @@ function animate() {
     sprite.position.x = waveCenterX + sprite.userData.baseX + wanderX;
     sprite.position.y = sprite.userData.baseY + wanderY;
 
-    // Slow natural Z-axis drift
     sprite.position.z += sprite.userData.zSpeed;
 
-    // If a symbol drifts too far past the camera, loop it back to the end of the tunnel
     if (sprite.position.z > startZ + 5) {
       sprite.position.z = deepZ - 10;
     }
   });
 
-  // Use composer for bloom
+  // --- RENDERING SEQUENCE ---
+  
+  // 1. Clear everything manually
+  renderer.clear();
+  
+  // 2. Render the glowing scene (Tubes, Particles, Syntax) through the Bloom Pass onto the screen
   composer.render();
+  
+  // 3. Clear the depth buffer. This ensures our snowmen render perfectly on top of the glowing background.
+  renderer.clearDepth();
+  
+  // 4. Render the snowmen directly to the screen WITHOUT Bloom over what's already there
+  renderer.render(nonGlowScene, camera);
 }
 animate();
 
