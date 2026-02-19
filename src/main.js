@@ -33,6 +33,7 @@ const deepZ = isMobile ? -75 : -95;
 
 // Global animation variables
 let particleSystem;
+const floatingSymbols = []; 
 const clock = new THREE.Clock();
 
 // ==========================
@@ -66,10 +67,9 @@ document.body.appendChild(renderer.domElement);
 // --- POST-PROCESSING (NEON GLOW) ---
 const renderScene = new RenderPass(scene, camera);
 
-// Resolution, strength, radius, threshold
 const bloomPass = new UnrealBloomPass(new THREE.Vector2(width, height), 1.5, 0.4, 0.85);
-bloomPass.threshold = 0.15;
-bloomPass.strength = 1.5; // High strength for neon look
+bloomPass.threshold = 0.08;
+bloomPass.strength = 0.5; 
 bloomPass.radius = 0.5;
 
 const composer = new EffectComposer(renderer);
@@ -92,19 +92,14 @@ function getWaveX(z) {
 function generateGradientTexture() {
   const canvas = document.createElement('canvas');
   canvas.width = 32;
-  canvas.height = 64; // Vertical gradient
+  canvas.height = 64; 
   const ctx = canvas.getContext('2d');
 
-  // Gradient runs along the length of the tube
   const gradient = ctx.createLinearGradient(0, 0, 0, 64);
-  
-  // 1. Fade In (Transparent)
   gradient.addColorStop(0, 'rgba(0, 255, 255, 0)');
-  // 2. Bright Core (Cyan)
   gradient.addColorStop(0.2, 'rgba(0, 255, 255, 0.5)');
-  gradient.addColorStop(0.5, 'rgba(255, 255, 255, 1)'); // White hot center
+  gradient.addColorStop(0.5, 'rgba(255, 255, 255, 1)'); 
   gradient.addColorStop(0.8, 'rgba(0, 255, 255, 0.5)');
-  // 3. Fade Out (Transparent)
   gradient.addColorStop(1, 'rgba(0, 255, 255, 0)');
 
   ctx.fillStyle = gradient;
@@ -112,12 +107,12 @@ function generateGradientTexture() {
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping; // Allows gradient to repeat if needed
+  texture.wrapT = THREE.RepeatWrapping; 
   return texture;
 }
 
 // ==========================
-// VISUAL EFFECTS (UPDATED)
+// VISUAL EFFECTS
 // ==========================
 
 function createTunnelVisuals() {
@@ -127,14 +122,13 @@ function createTunnelVisuals() {
   const pointsPerLine = 60;
   const gradientTexture = generateGradientTexture();
 
-  // Material for the tubes
   const tubeMaterial = new THREE.MeshBasicMaterial({
     map: gradientTexture,
     transparent: true,
     opacity: 0.8,
     blending: THREE.AdditiveBlending,
     side: THREE.DoubleSide,
-    depthWrite: false // Helps with transparency overlapping
+    depthWrite: false
   });
 
   for (let i = 0; i < lineCount; i++) {
@@ -142,7 +136,6 @@ function createTunnelVisuals() {
     const offsetX = (Math.random() - 0.5) * 14; 
     const offsetY = (Math.random() - 0.5) * 8 + cameraHeight;
 
-    // Generate path points
     for (let j = 0; j <= pointsPerLine; j++) {
       const ratio = j / pointsPerLine;
       const z = deepZ + (ratio * (Math.abs(deepZ - startZ) + 30)) - 10; 
@@ -150,21 +143,8 @@ function createTunnelVisuals() {
       points.push(new THREE.Vector3(x, offsetY, z));
     }
 
-    // Create a smooth curve from points
     const curve = new THREE.CatmullRomCurve3(points);
-    
-    // Create Tube Geometry (path, segments, radius, radialSegments, closed)
-    // Radius 0.04 gives it thickness
     const geometry = new THREE.TubeGeometry(curve, 100, 0.04, 8, false);
-    
-    // Adjust UVs to map gradient along the length correctly
-    // By default Tube maps U around, V along length. We want gradient along V.
-    const uvAttribute = geometry.attributes.uv;
-    for (let k = 0; k < uvAttribute.count; k++) {
-        // Scale UVs if necessary to repeat the gradient or stretch it
-        // uvAttribute.setY(k, uvAttribute.getY(k) * 1); 
-    }
-    
     const mesh = new THREE.Mesh(geometry, tubeMaterial);
     scene.add(mesh);
   }
@@ -207,7 +187,88 @@ function createTunnelVisuals() {
   scene.add(particleSystem);
 }
 
+// ==========================
+// DEVELOPER SYNTAX / MATH SYMBOLS
+// ==========================
+
+function createFloatingSymbols() {
+  const chars = [
+    '{', '</>', '=>', '||', '&&', '!=', '===', '();', '[]', '==','0','1', ';', '//', '/*',
+    '∑', '∫', 'π', '∞', 'λ', 'Δ', 'Ω', 'θ', '√', '≈', '≠',
+    '404', '!', 'X', 'null'
+  ];
+  
+  const baseColors = ['#00ffff', '#00aaff', '#ff0000ff', '#00ff88'];
+
+  const materials = chars.flatMap(char => {
+    return baseColors.map(colorHex => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      
+      // UPDATED: Reduced shadow blur so text stays crisp
+      ctx.shadowColor = colorHex;
+      ctx.shadowBlur = 4; 
+      ctx.fillStyle = colorHex;
+      
+      // UPDATED: Bumped up the font size relative to the canvas
+      ctx.font = 'bold 50px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      
+      ctx.fillText(char, 64, 64);
+      
+      const texture = new THREE.CanvasTexture(canvas);
+      
+      const material = new THREE.SpriteMaterial({ 
+        map: texture, 
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        opacity: 0.9,
+        depthWrite: false
+      });
+      
+      // UPDATED: Removed the scalar multiplier to prevent blowout
+      material.color.set(colorHex);
+
+      return material;
+    });
+  });
+
+  const symbolCount = 55; 
+
+  for (let i = 0; i < symbolCount; i++) {
+    const randomMaterial = materials[Math.floor(Math.random() * materials.length)];
+    const sprite = new THREE.Sprite(randomMaterial);
+    
+    const z = deepZ + Math.random() * (Math.abs(deepZ - startZ) + 20) - 10;
+    const spreadX = (Math.random() - 0.5) * 20; 
+    const x = getWaveX(z) + spreadX;
+    const y = (Math.random() - 0.5) * 14 + cameraHeight;
+    
+    sprite.position.set(x, y, z);
+    
+    // UPDATED: Increased the scale range for larger, more visible symbols
+    const scale = 0.5 + Math.random() * 0.7; // Generates sizes between 0.5 and 1.2
+    sprite.scale.set(scale, scale, scale);
+    
+    sprite.userData = {
+       baseX: spreadX,
+       baseY: y,
+       speedX: (Math.random() - 0.5) * 0.15, 
+       speedY: (Math.random() - 0.5) * 0.15,
+       phase: Math.random() * Math.PI * 2,
+       zSpeed: Math.random() * 0.02 + 0.005 
+    };
+    
+    scene.add(sprite);
+    floatingSymbols.push(sprite);
+  }
+}
+
 createTunnelVisuals();
+createFloatingSymbols();
 
 // ==========================
 // INITIAL CAMERA & ASSETS
@@ -215,7 +276,6 @@ createTunnelVisuals();
 
 camera.position.set(getWaveX(deepZ), cameraHeight, deepZ);
 camera.lookAt(getWaveX(deepZ), cameraHeight, deepZ - lookAheadDistance);
-
 
 const textureLoader = new THREE.TextureLoader();
 const svgTexture = textureLoader.load('./public/models/snowman.png');
@@ -291,7 +351,7 @@ function animate() {
   
   const time = clock.getElapsedTime();
 
-  // --- Animate Particles (Lines are skipped so they stay static) ---
+  // --- Animate Particles ---
   if (particleSystem) {
     const positions = particleSystem.geometry.attributes.position.array;
     const data = particleSystem.geometry.userData.animationData;
@@ -303,7 +363,6 @@ function animate() {
       
       const waveCenterX = getWaveX(z);
       
-      // Particles still wander organically
       const wanderX = Math.sin(time * particleData.speedX + particleData.phase) * 0.5;
       const wanderY = Math.cos(time * particleData.speedY + particleData.phase) * 0.5;
 
@@ -312,6 +371,25 @@ function animate() {
     }
     particleSystem.geometry.attributes.position.needsUpdate = true;
   }
+
+  // --- Animate Developer Symbols ---
+  floatingSymbols.forEach(sprite => {
+    const waveCenterX = getWaveX(sprite.position.z);
+    
+    const wanderX = Math.sin(time * sprite.userData.speedX + sprite.userData.phase) * 0.3;
+    const wanderY = Math.cos(time * sprite.userData.speedY + sprite.userData.phase) * 0.3;
+    
+    sprite.position.x = waveCenterX + sprite.userData.baseX + wanderX;
+    sprite.position.y = sprite.userData.baseY + wanderY;
+
+    // Slow natural Z-axis drift
+    sprite.position.z += sprite.userData.zSpeed;
+
+    // If a symbol drifts too far past the camera, loop it back to the end of the tunnel
+    if (sprite.position.z > startZ + 5) {
+      sprite.position.z = deepZ - 10;
+    }
+  });
 
   // Use composer for bloom
   composer.render();
